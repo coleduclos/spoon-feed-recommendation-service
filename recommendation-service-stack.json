@@ -1,0 +1,193 @@
+{
+    "Parameters" : {
+        "Owner" : {
+            "Type" : "String",
+            "Description" : "Enter the owner of the ECS service."
+        },
+        "AppName" : {
+            "Type" : "String",
+            "Description" : "Enter the name of the application to be deployed via ECS."
+        },
+        "ContainerImage" : {
+            "Type" : "String",
+            "Description" : "Enter the url for the container image to be spun up."
+        },
+        "ContainerCPU" : {
+            "Type" : "Number",
+            "Default" : "0",
+            "Description" : "Enter the minimum number of CPU units to reserve for the container."
+        },
+        "ContainerMemory" : {
+            "Type" : "Number",
+            "Default" : "128",
+            "Description" : "Enter the amount of memory (MB) to reserve for the container."
+        },
+        "TaskVolumeName" : {
+            "Type" : "String",
+            "Description" : "Enter the name of the host volume to be mounted."
+        },
+        "TaskVolumeHostSourcePath" : {
+            "Type" : "String",
+            "Description" : "Enter the source path of the host volume to be mounted."
+        },
+        "MountPointContainerPath" : {
+            "Type" : "String",
+            "Description" : "Enter the container path to be mounted to the volume."
+        },
+        "ECSClusterName" : {
+            "Type" : "String",
+            "Default" : "test-ecs-cluster",
+            "Description" : "Enter the name of the ECS cluster to deploy the service."
+        },
+        "ECSTaskRole" : {
+            "Type" : "String",
+            "Description" : "Enter the IAM role to be assigned to the ECS Task."
+        },
+        "ServiceInitialDesiredCount" : {
+            "Type" : "Number",
+            "Default" : "0",
+            "Description" : "Enter the initial desired count of service instances running."
+        },
+        "ServiceMinCapacity" : {
+            "Type" : "Number",
+            "Default" : "0",
+            "Description" : "Enter the minimum number of service instances running."
+        },
+        "ServiceMaxCapacity" : {
+            "Type" : "Number",
+            "Default" : "10",
+            "Description" : "Enter the maximum number of service instances running."
+        },
+        "ECSAutoScalingRoleARN" : {
+            "Type" : "String", 
+            "Description" : "Enter the IAM ARN for the ECS autoscaling role. For example: arn:aws:iam::<acct_num>:role/ecsAutoscaleRole."
+        },
+        "SQSQueueName" : {
+            "Type" : "String",
+            "Description" : "Enter the name of the SQS queue that will intiate the scaling actions."
+        }
+    },
+    "Resources" : {
+        "SQSAlarmHigh": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Scale-up if messages visible in SQS Queue > 0 for 5 minutes",
+                "MetricName": "ApproximateNumberOfMessagesVisible",
+                "Namespace": "AWS/SQS",
+                "Statistic": "Average",
+                "Period": "300",
+                "EvaluationPeriods": "1",
+                "Threshold": "0",
+                "AlarmActions": [ { "Ref": "ScaleOutPolicy" } ],
+                "Dimensions": [
+                    {
+                        "Name" : "QueueName",
+                        "Value" : { "Ref" : "SQSQueueName" }
+                    }
+                ],
+                "ComparisonOperator": "GreaterThanThreshold"
+            }
+        },
+        "SQSAlarmLow": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Scale-in if messages visible in SQS Queue = 0 for 5 minutes",
+                "MetricName": "ApproximateNumberOfMessagesVisible",
+                "Namespace": "AWS/SQS",
+                "Statistic": "Average",
+                "Period": "300",
+                "EvaluationPeriods": "1",
+                "Threshold": "0",
+                "AlarmActions": [ { "Ref": "ScaleInPolicy" } ],
+                "Dimensions": [
+                    {
+                        "Name" : "QueueName",
+                        "Value" : { "Ref" : "SQSQueueName" }
+                    }
+                ],
+                "ComparisonOperator": "LessThanOrEqualToThreshold"
+            }
+        },
+        "ScaleOutPolicy" : {
+            "Type" : "AWS::ApplicationAutoScaling::ScalingPolicy",
+            "Properties" : {
+                "PolicyName" : "ScaleOutPolicy",
+                "PolicyType" : "StepScaling",
+                "ScalingTargetId" : { "Ref" : "ApplicationScalableTarget" },
+                "StepScalingPolicyConfiguration" : {
+                    "AdjustmentType" : "ChangeInCapacity",
+                    "Cooldown" : 60,
+                    "MetricAggregationType" : "Average",
+                    "StepAdjustments" : [{
+                        "MetricIntervalLowerBound" : 0,
+                        "ScalingAdjustment" : 1
+                    }]
+                }
+            }
+        },
+        "ScaleInPolicy" : {
+            "Type" : "AWS::ApplicationAutoScaling::ScalingPolicy",
+            "Properties" : {
+                "PolicyName" : "ScaleInPolicy",
+                "PolicyType" : "StepScaling",
+                "ScalingTargetId" : { "Ref": "ApplicationScalableTarget" },
+                "StepScalingPolicyConfiguration" : {
+                    "AdjustmentType" : "ExactCapacity",
+                    "Cooldown" : 60,
+                    "MetricAggregationType" : "Average",
+                    "StepAdjustments" : [{
+                        "MetricIntervalUpperBound" : 0,
+                        "ScalingAdjustment" : 0
+                    }]
+                }
+            }
+        },
+        "ApplicationScalableTarget" : {
+            "Type" : "AWS::ApplicationAutoScaling::ScalableTarget",
+            "Properties" : {
+                "MinCapacity" : { "Ref" : "ServiceMinCapacity" },
+                "MaxCapacity" : { "Ref" : "ServiceMaxCapacity" },
+                "ResourceId" : { "Fn::Join" : [ "/", [ "service", { "Ref" : "ECSClusterName" }, { "Fn::GetAtt" : [ "ECSService", "Name"] } ] ] },
+                "RoleARN" : { "Ref" : "ECSAutoScalingRoleARN" },
+                "ScalableDimension" : "ecs:service:DesiredCount",
+                "ServiceNamespace" : "ecs"
+            }
+        },
+        "ECSService" : {
+            "Type" : "AWS::ECS::Service",
+            "Properties" : {
+                "Cluster" : { "Ref" : "ECSClusterName" },
+                "DesiredCount" : { "Ref" : "ServiceInitialDesiredCount" },
+                "TaskDefinition" : { "Ref" : "ECSTaskDefinition" }
+            }
+        },
+        "ECSTaskDefinition" : {
+            "Type" : "AWS::ECS::TaskDefinition",
+            "Properties" : {
+                "Family" : { "Ref" : "AppName" },
+                "TaskRoleArn" : { "Ref" : "ECSTaskRole" },
+                "ContainerDefinitions" : [ 
+                    {
+                        "Name": { "Ref" : "AppName" },
+                        "MountPoints": [
+                            {
+                                "SourceVolume": { "Ref" : "TaskVolumeName" },
+                                "ContainerPath": { "Ref" : "MountPointContainerPath" }
+                            }
+                        ],
+                        "Image": { "Ref" : "ContainerImage" },
+                        "Cpu": { "Ref" : "ContainerCPU" },
+                        "Memory": { "Ref" : "ContainerMemory" }
+                    }
+                ],
+                "Volumes": [
+                {
+                    "Host": {
+                        "SourcePath": { "Ref" : "TaskVolumeHostSourcePath" }
+                    },
+                    "Name": { "Ref" : "TaskVolumeName" }
+                }]
+            }
+        }
+    }
+}

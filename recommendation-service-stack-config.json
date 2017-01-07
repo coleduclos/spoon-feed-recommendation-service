@@ -1,0 +1,19 @@
+{
+    "Parameters" : {
+        "AppName" : "cf-duclos-app-recommendation-service",
+        "ContainerCPU" : "0",
+        "ContainerImage" : "287222052256.dkr.ecr.us-west-2.amazonaws.com/duclos-app/recommendation-service",
+        "ContainerMemory" : "128",
+        "ECSAutoScalingRoleARN" : "arn:aws:iam::287222052256:role/ecsAutoscaleRole",
+        "ECSClusterName" : "duclos-app-ecs-cluster",
+        "ECSTaskRole" : "duclos-app-recommendation-service-role",
+        "MountPointContainerPath" : "/tmp/test",
+        "Owner" : "cole.duclos",
+        "ServiceInitialDesiredCount" : "0",
+        "ServiceMaxCapacity" : "10",
+        "ServiceMinCapacity" : "0",
+        "SQSQueueName" : "duclos-app-recommendation-queue",
+        "TaskVolumeHostSourcePath" : "/tmp/test",
+        "TaskVolumeName" : "tmp-test"
+    }
+}
