@@ -22,7 +22,7 @@ def update_recommendations(rating):
     user_ratings_restaurant_id_list = []
     near_restaurant_id_list = []
     # Get the current recommendations for the user
-    recommendation_map = dynamodb_client.get_recommendation_map_by_user_id(user_id)['Items'] 
+    recommendation_map = dynamodb_client.get_recommendation_map_by_lat_long_and_user_id(restaurant_location['lat'], restaurant_location['lng'], user_id)['Items'] 
     if len(recommendation_map) > 0:
         recommendation_map = recommendation_map[0]['recommendation-map']
     else:
@@ -38,7 +38,7 @@ def update_recommendations(rating):
     near_restaurants = dynamodb_client.get_near_restaurants_by_lat_long(restaurant_location['lat'], restaurant_location['lng'])['Items']
     for restaurant in near_restaurants:
         near_restaurant_id_list.append(restaurant['restaurant-id'])
-    restaurants_not_rated = set(user_ratings_restaurant_id_list)^set(near_restaurant_id_list)
+    restaurants_not_rated = set(near_restaurant_id_list) - set(user_ratings_restaurant_id_list)
     # For each restaurant not rated, compute the probability the user will like the restaurant
     for restaurant_id in restaurants_not_rated:
         r_ratings = dynamodb_client.get_all_ratings_by_restaurant_id(restaurant_id)['Items']
@@ -53,7 +53,8 @@ def update_recommendations(rating):
                     if rating_value > 0 else probability_numerator - user_similarity_index_map[rating_user]
             recommendation_map[rating_restaurant] = Decimal(probability_numerator) / Decimal(probability_denominator) 
     # Update DynamoDB with the recommendation map for the user
-    dynamodb_client.update_user_recommendation_map(user_id, recommendation_map)
+    if len(recommendation_map) > 0:
+        dynamodb_client.update_user_recommendation_map(restaurant_location['lat'], restaurant_location['lng'], user_id, recommendation_map)
 
 if __name__ == "__main__":
     main()

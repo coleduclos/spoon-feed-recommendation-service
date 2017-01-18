@@ -79,26 +79,31 @@ def update_user_similarity_index_map (user_id, similarity_index_map):
         }
     )
 
-def get_recommendation_map_by_user_id (user_id):
+def get_recommendation_map_by_lat_long_and_user_id (latitude, longitude, user_id):
     print('Querying DynamoDB for the recommendation map of user: {} in table {}'
         .format(user_id, config.recommendations_dynamodb_table_name))
+    geohash = Geohash.encode(latitude, longitude, precision=config.restaurants_dynamodb_geohash_precision)
     response = config.recommendations_dynamodb_table.query(
-        KeyConditionExpression='#partitionkey = :partitionkeyval',
+        KeyConditionExpression='#partitionkey = :partitionkeyval AND #sortkey = :sortkeyval',
         ExpressionAttributeNames={
-            '#partitionkey' : config.recommendations_pkey
+            '#partitionkey' : config.recommendations_pkey,
+            '#sortkey' : config.recommendations_skey
         },
         ExpressionAttributeValues={
-            ':partitionkeyval' : user_id
+            ':partitionkeyval' : geohash,
+            ':sortkeyval' : user_id
         }
     )
     return response
 
-def update_user_recommendation_map (user_id, recommendation_map):
+def update_user_recommendation_map (latitude, longitude, user_id, recommendation_map):
     print('Updating DynamoDB with recommendation map for  user: {} in table {}'
         .format(user_id, config.recommendations_dynamodb_table_name))
+    geohash = Geohash.encode(latitude, longitude, precision=config.restaurants_dynamodb_geohash_precision)
     response = config.recommendations_dynamodb_table.update_item(
         Key={
-            config.recommendations_pkey : user_id
+            config.recommendations_pkey : geohash,
+            config.recommendations_skey : user_id
         },
         UpdateExpression='SET #attribute = :val',
         ExpressionAttributeNames={
