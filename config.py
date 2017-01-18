@@ -31,6 +31,6 @@ similarity_index_map_attribute = 'similarity-index-map'
 
 recommendations_dynamodb_table_name = 'duclos-app-recommendations'
 recommendations_dynamodb_table = dynamodb.Table(recommendations_dynamodb_table_name)
-recommendations_pkey = 'geohash'
-recommendations_skey = 'user-id'
+recommendations_pkey = 'user-id'
+recommendations_skey = 'geohash'
 recommendation_map_attribute = 'recommendation-map'

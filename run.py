@@ -22,7 +22,7 @@ def update_recommendations(rating):
     user_ratings_restaurant_id_list = []
     near_restaurant_id_list = []
     # Get the current recommendations for the user
-    recommendation_map = dynamodb_client.get_recommendation_map_by_lat_long_and_user_id(restaurant_location['lat'], restaurant_location['lng'], user_id)['Items'] 
+    recommendation_map = dynamodb_client.get_recommendation_map_by_user_id_and_lat_lng(user_id, restaurant_location['lat'], restaurant_location['lng'])['Items'] 
     if len(recommendation_map) > 0:
         recommendation_map = recommendation_map[0]['recommendation-map']
     else:
@@ -54,7 +54,7 @@ def update_recommendations(rating):
             recommendation_map[rating_restaurant] = Decimal(probability_numerator) / Decimal(probability_denominator) 
     # Update DynamoDB with the recommendation map for the user
     if len(recommendation_map) > 0:
-        dynamodb_client.update_user_recommendation_map(restaurant_location['lat'], restaurant_location['lng'], user_id, recommendation_map)
+        dynamodb_client.update_user_recommendation_map(user_id, restaurant_location['lat'], restaurant_location['lng'], recommendation_map)
 
 if __name__ == "__main__":
     main()
